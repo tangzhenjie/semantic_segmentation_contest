@@ -2,10 +2,9 @@ from utils import preprocessing
 import tensorflow as tf
 import os
 
-_NUM_CLASSES = 21
 # Randomly crop or pad a [_HEIGHT, _WIDTH] section of the image and label.
-_HEIGHT = 513
-_WIDTH = 513
+_HEIGHT = 500
+_WIDTH = 500
 
 # image chanel
 _DEPTH = 3
@@ -18,8 +17,8 @@ _MAX_SCALE = 2.0
 _IGNORE_LABEL = 255
 
 _NUM_IMAGES = {
-    'train': 10582,
-    'validation': 1449,
+    'train': 20000,
+    'validation': 1000,
 }
 def get_filenames(is_training, data_dir):
   """Return a list of filenames.
@@ -32,45 +31,28 @@ def get_filenames(is_training, data_dir):
     A list of file names.
   """
   if is_training:
-    return [os.path.join(data_dir, 'voc_train.record')]
+    return [os.path.join(data_dir, 'train2.record')]
   else:
-    return [os.path.join(data_dir, 'voc_val.record')]
+    return [os.path.join(data_dir, 'val2.record')]
 
 
 def parse_record(raw_record):
-  """Parse PASCAL image and label from a tf record."""
-  keys_to_features = {
-      'image/height':
-      tf.FixedLenFeature((), tf.int64),
-      'image/width':
-      tf.FixedLenFeature((), tf.int64),
-      'image/encoded':
-      tf.FixedLenFeature((), tf.string, default_value=''),
-      'image/format':
-      tf.FixedLenFeature((), tf.string, default_value='jpeg'),
-      'label/encoded':
-      tf.FixedLenFeature((), tf.string, default_value=''),
-      'label/format':
-      tf.FixedLenFeature((), tf.string, default_value='png'),
-  }
+    """Parse PASCAL image and label from a tf record."""
+    features = tf.parse_single_example(
+      raw_record, features={
+          'data': tf.FixedLenFeature([], tf.string),
+          'label': tf.FixedLenFeature([], tf.string),
+      })
 
-  parsed = tf.parse_single_example(raw_record, keys_to_features)
+    image = tf.decode_raw(features['data'], tf.uint8)
+    image = tf.reshape(image, [500, 500, 4])
+    image = tf.cast(image, dtype=tf.float32)
 
-  # height = tf.cast(parsed['image/height'], tf.int32)
-  # width = tf.cast(parsed['image/width'], tf.int32)
+    label = tf.decode_raw(features['label'], tf.uint8)
+    label = tf.reshape(label, [500, 500, 1])
+    label = tf.cast(label, dtype=tf.int32)
 
-  image = tf.image.decode_image(
-      tf.reshape(parsed['image/encoded'], shape=[]), _DEPTH)
-  image = tf.to_float(tf.image.convert_image_dtype(image, dtype=tf.uint8))
-  image.set_shape([None, None, 3])
-
-  label = tf.image.decode_image(
-      tf.reshape(parsed['label/encoded'], shape=[]), 1)
-  label = tf.to_int32(tf.image.convert_image_dtype(label, dtype=tf.uint8))
-  label.set_shape([None, None, 1])
-
-  return image, label
-
+    return image, label
 
 def preprocess_image(image, label, is_training):
   """Preprocess a single image of layout [height, width, depth]."""
@@ -95,40 +77,34 @@ def preprocess_image(image, label, is_training):
   return image, label
 
 def train_or_eval_input_fn(is_training, data_dir, batch_size, num_epochs=None):
-  """Input_fn using the tf.data input pipeline for CIFAR-10 dataset.
+    """Input_fn using the tf.data input pipeline for CIFAR-10 dataset.
 
-  Args:
+    Args:
     is_training: A boolean denoting whether the input is for training.
     data_dir: The directory containing the input data.
     batch_size: The number of samples per batch.
     num_epochs: The number of epochs to repeat the dataset.
 
-  Returns:
+    Returns:
     A tuple of images and labels.
-  """
-  dataset = tf.data.Dataset.from_tensor_slices(get_filenames(is_training, data_dir))
-  dataset = dataset.flat_map(tf.data.TFRecordDataset)
+    """
+    dataset = tf.data.Dataset.from_tensor_slices(get_filenames(is_training, data_dir))
+    dataset = dataset.flat_map(tf.data.TFRecordDataset)
 
-  if is_training:
-    # When choosing shuffle buffer sizes, larger sizes result in better
-    # randomness, while smaller sizes have better performance.
-    # is a relatively small dataset, we choose to shuffle the full epoch.
-    dataset = dataset.shuffle(buffer_size=_NUM_IMAGES['train'])
+    if is_training:
+        dataset = dataset.shuffle(buffer_size=_NUM_IMAGES['train'])
 
-  dataset = dataset.map(parse_record)
-  dataset = dataset.map(
-      lambda image, label: preprocess_image(image, label, is_training))
-  dataset = dataset.prefetch(batch_size)
+    dataset = dataset.map(parse_record)
+    dataset = dataset.map(
+        lambda image, label: preprocess_image(image, label, is_training))
+    dataset = dataset.prefetch(batch_size)
 
-  # We call repeat after shuffling, rather than before, to prevent separate
-  # epochs from blending together.
-  dataset = dataset.repeat(num_epochs)
-  dataset = dataset.batch(batch_size)
+    # We call repeat after shuffling, rather than before, to prevent separate
+    # epochs from blending together.
+    dataset = dataset.repeat(num_epochs)
+    dataset = dataset.batch(batch_size)
 
-  #iterator = dataset.make_one_shot_iterator()
-  #images, labels = iterator.get_next()
-
-  return dataset
+    return dataset
 
 def eval_or_test_input_fn(image_filenames, label_filenames=None, batch_size=1):
   """An input function for evaluation and inference.

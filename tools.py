@@ -17,8 +17,7 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     pred_classes = tf.expand_dims(tf.argmax(logits, axis=3, output_type=tf.int32), axis=3)
 
     # 解码预测结果
-    pred_decoded_labels = tf.cond(is_training, true_fn=lambda: tf.py_func(preprocessing.decode_labels, [pred_classes, batch_size, args.number_of_classes], tf.uint8),
-            false_fn=lambda: tf.py_func(preprocessing.decode_labels, [pred_classes, 1, args.number_of_classes], tf.uint8))
+    pred_decoded_labels = tf.py_func(preprocessing.decode_labels, [pred_classes, batch_size, args.number_of_classes], tf.uint8)
 
 
     predictions = {
@@ -28,9 +27,8 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     }
 
     # 解码标签
-    gt_decoded_labels = tf.cond(is_training,
-            true_fn=lambda: tf.py_func(preprocessing.decode_labels, [y, batch_size, args.number_of_classes], tf.uint8),
-            false_fn=lambda: tf.py_func(preprocessing.decode_labels, [y, 1, args.number_of_classes], tf.uint8))
+    gt_decoded_labels = tf.py_func(preprocessing.decode_labels, [y, batch_size, args.number_of_classes], tf.uint8)
+
 
     tf.summary.image('images', tf.concat(axis=2, values=[images, gt_decoded_labels, pred_decoded_labels]),
                      max_outputs=args.tensorboard_images_max_outputs)
@@ -69,7 +67,7 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
         args.max_iter, args.end_learning_rate, power=0.9)  # args.max_iter = 30000 args.initial_global_step=0
     tf.summary.scalar('learning_rate', learning_rate)
 
-    optimizer = tf.train.MomentumOptimizer(learning_rate=1e-6, momentum=0.9)
+    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9)
 
     # Batch norm requires update ops to be added as a dependency to the train_op
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
