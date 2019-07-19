@@ -83,8 +83,11 @@ def main():
         tf.local_variables_initializer(),
         tf.global_variables_initializer()
     )
+    # 首次运行从deeplabv3中获取权重需要剔除logits层
+    exclude = [args.resnet_model + '/logits', 'DeepLab_v3/logits', 'global_step']
+    variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
 
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(variables_to_restore)
     summary_writer_train = tf.summary.FileWriter(summary_path + "train/")
     summary_writer_val = tf.summary.FileWriter(summary_path + "val/")
     # 运行图

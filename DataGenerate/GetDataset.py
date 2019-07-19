@@ -31,9 +31,9 @@ def get_filenames(is_training, data_dir):
     A list of file names.
   """
   if is_training:
-    return [os.path.join(data_dir, 'train2.record')]
+    return [os.path.join(data_dir, 'train2.tfrecord')]
   else:
-    return [os.path.join(data_dir, 'val2.record')]
+    return [os.path.join(data_dir, 'val2.tfrecord')]
 
 
 def parse_record(raw_record):
@@ -95,8 +95,8 @@ def train_or_eval_input_fn(is_training, data_dir, batch_size, num_epochs=None):
         dataset = dataset.shuffle(buffer_size=_NUM_IMAGES['train'])
 
     dataset = dataset.map(parse_record)
-    dataset = dataset.map(
-        lambda image, label: preprocess_image(image, label, is_training))
+    #dataset = dataset.map(
+    #    lambda image, label: preprocess_image(image, label, is_training))
     dataset = dataset.prefetch(batch_size)
 
     # We call repeat after shuffling, rather than before, to prevent separate
