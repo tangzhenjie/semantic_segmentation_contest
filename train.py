@@ -64,9 +64,9 @@ def main():
     y = tf.placeholder(dtype=tf.int32, shape=[None, None, None, 1], name="label_batch")
 
     train_dataset = train_or_eval_input_fn(is_training=True,
-                                           data_dir="./DatasetNew/train/", batch_size=batch_size)
+                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/train/", batch_size=batch_size)
     eval_dataset = train_or_eval_input_fn(is_training=False,
-                                           data_dir="./DatasetNew/val/", batch_size=batch_size, num_epochs=1)
+                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/val/", batch_size=batch_size, num_epochs=1)
     iterator_train = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
     next_batch = iterator_train.get_next()
     training_init_op = iterator_train.make_initializer(train_dataset)
@@ -76,6 +76,8 @@ def main():
 
     accuracy = metrics["px_accuracy"]
     mean_iou = metrics["mean_iou"]
+    confusion_matrix = predictions['confusion_matrix']
+
     summary_op = tf.summary.merge_all()
     init_op = tf.group(
         tf.local_variables_initializer(),
@@ -104,14 +106,16 @@ def main():
             for step in range((epoch * train_batches_of_epoch), ((epoch + 1) * train_batches_of_epoch)):
                 img_batch, label_batch = sess.run(next_batch)
                 img_batch = img_batch[:, :, :, 0:3]
-                loss_value, _, acc, m_iou, merge = sess.run(
-                    [loss, train_op, accuracy, mean_iou, summary_op],
+                loss_value, _, acc, m_iou, merge, con_matrix = sess.run(
+                    [loss, train_op, accuracy, mean_iou, summary_op, confusion_matrix],
                     feed_dict={x: img_batch, y: label_batch, is_train: True})
 
-                if (step + 1) % 100 == 0:
+                if (step + 1) % 50 == 0:
+                    kappa = tools.kappa(con_matrix)
                     print("{} {} loss = {:.4f}".format(datetime.datetime.now(), step + 1, loss_value))
                     print("accuracy{}".format(acc))
                     print("miou{}".format(m_iou))
+                    print("kappa{}".format(kappa))
                     summary_writer_train.add_summary(merge, step + 1)
             saver.save(sess, checkpoint_path + "model.ckpt", epoch + 1)
             print("checkpoint saved")
@@ -121,28 +125,32 @@ def main():
             print("{} Start validation".format(datetime.datetime.now()))
             test_acc = 0.0
             test_miou = 0.0
+            test_kappa = 0.0
             test_count = 0
             for tag in range(val_batches_of_epoch):
                 img_batch, label_batch = sess.run(next_batch)
                 img_batch = img_batch[:, :, :, 0:3]
-                acc, m_iou, merge = sess.run(
-                    [accuracy, mean_iou, summary_op],
+                acc, m_iou, merge, con_matrix = sess.run(
+                    [accuracy, mean_iou, summary_op, confusion_matrix],
                     feed_dict={x: img_batch, y: label_batch, is_train: False})
 
-                if (tag + 1) % 100 == 0:
-                    summary_writer_val.add_summary(merge, tag + 1)
+                kappa = tools.kappa(con_matrix)
+                test_kappa += kappa
                 test_acc += acc
                 test_miou += m_iou
                 test_count += 1
             test_acc /= test_count
             test_miou /= test_count
+            test_kappa /= test_count
             s = tf.Summary(value=[
                 tf.Summary.Value(tag="validation_accuracy", simple_value=test_acc),
-                tf.Summary.Value(tag="validation_miou", simple_value=test_miou)
+                tf.Summary.Value(tag="validation_miou", simple_value=test_miou),
+                tf.Summary.Value(tag="validation_kappa", simple_value=test_kappa)
             ])
             summary_writer_val.add_summary(s, epoch + 1)
             print("{} Validation Accuracy = {:.4f}".format(datetime.datetime.now(), test_acc))
             print("{} Validation miou = {:.4f}".format(datetime.datetime.now(), test_miou))
+            print("{} Validation kappa = {:.4f}".format(datetime.datetime.now(), test_kappa))
 
 if __name__ == '__main__':
   tf.logging.set_verbosity(tf.logging.INFO)

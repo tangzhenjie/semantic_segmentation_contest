@@ -124,3 +124,16 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     metrics = {'px_accuracy': accuracy, 'mean_iou': mean_iou}
 
     return loss, train_op, predictions, metrics
+
+
+# 没有对输入的合法性进行校验
+# 使用时需要注意
+def kappa(confusion_matrix):
+    """计算kappa值系数"""
+    confusion_matrix = confusion_matrix.astype(np.int64)
+    pe_rows = np.sum(confusion_matrix, axis=0)  # 每一类真实值
+    pe_cols = np.sum(confusion_matrix, axis=1)  # 预测出每一类的总数
+    sum_total = sum(pe_cols)   # 样本总数
+    pe = np.dot(pe_rows, pe_cols) / float(sum_total * sum_total)
+    po = np.trace(confusion_matrix) / float(sum_total)
+    return (po - pe) / (1 - pe)
