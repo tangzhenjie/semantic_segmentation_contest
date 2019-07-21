@@ -48,6 +48,7 @@ def parse_record(raw_record):
     image = tf.reshape(image, [500, 500, 4])
     image = tf.cast(image, dtype=tf.float32)
 
+    image = tf.gather(image, [0, 1, 2], axis=2)
     label = tf.decode_raw(features['label'], tf.uint8)
     label = tf.reshape(label, [500, 500, 1])
     label = tf.cast(label, dtype=tf.int32)
@@ -58,12 +59,12 @@ def preprocess_image(image, label, is_training):
   """Preprocess a single image of layout [height, width, depth]."""
   if is_training:
     # Randomly scale the image and label.
-    image, label = preprocessing.random_rescale_image_and_label(
-        image, label, _MIN_SCALE, _MAX_SCALE)
+    #image, label = preprocessing.random_rescale_image_and_label(
+    #    image, label, _MIN_SCALE, _MAX_SCALE)
 
     # Randomly crop or pad a [_HEIGHT, _WIDTH] section of the image and label.
-    image, label = preprocessing.random_crop_or_pad_image_and_label(
-        image, label, _HEIGHT, _WIDTH, _IGNORE_LABEL)
+    #image, label = preprocessing.random_crop_or_pad_image_and_label(
+    #    image, label, _HEIGHT, _WIDTH, _IGNORE_LABEL)
 
     # Randomly flip the image and label horizontally.
     image, label = preprocessing.random_flip_left_right_image_and_label(
@@ -95,8 +96,8 @@ def train_or_eval_input_fn(is_training, data_dir, batch_size, num_epochs=None):
         dataset = dataset.shuffle(buffer_size=_NUM_IMAGES['train'])
 
     dataset = dataset.map(parse_record)
-    #dataset = dataset.map(
-    #    lambda image, label: preprocess_image(image, label, is_training))
+    dataset = dataset.map(
+        lambda image, label: preprocess_image(image, label, is_training))
     dataset = dataset.prefetch(batch_size)
 
     # We call repeat after shuffling, rather than before, to prevent separate

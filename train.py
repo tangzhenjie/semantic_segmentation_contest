@@ -87,7 +87,8 @@ def main():
     exclude = [args.resnet_model + '/logits', 'DeepLab_v3/logits', 'global_step']
     variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
 
-    saver = tf.train.Saver(variables_to_restore)
+    saver_first = tf.train.Saver(variables_to_restore)
+    saver = tf.train.Saver()
     summary_writer_train = tf.summary.FileWriter(summary_path + "train/")
     summary_writer_val = tf.summary.FileWriter(summary_path + "val/")
     # 运行图
@@ -97,7 +98,7 @@ def main():
         sess.run(init_op, feed_dict={is_train: True})
         ckpt = tf.train.get_checkpoint_state(checkpoint_path)
         if ckpt and ckpt.model_checkpoint_path:
-            saver.restore(sess, ckpt.model_checkpoint_path)
+            saver_first.restore(sess, ckpt.model_checkpoint_path)
         sess.graph.finalize()
 
         train_batches_of_epoch = int(math.ceil(train_set_length / batch_size))
@@ -108,7 +109,6 @@ def main():
             # step = 1
             for step in range((epoch * train_batches_of_epoch), ((epoch + 1) * train_batches_of_epoch)):
                 img_batch, label_batch = sess.run(next_batch)
-                img_batch = img_batch[:, :, :, 0:3]
                 loss_value, _, acc, m_iou, merge, con_matrix = sess.run(
                     [loss, train_op, accuracy, mean_iou, summary_op, confusion_matrix],
                     feed_dict={x: img_batch, y: label_batch, is_train: True})
@@ -132,7 +132,6 @@ def main():
             test_count = 0
             for tag in range(val_batches_of_epoch):
                 img_batch, label_batch = sess.run(next_batch)
-                img_batch = img_batch[:, :, :, 0:3]
                 acc, m_iou, merge, con_matrix = sess.run(
                     [accuracy, mean_iou, summary_op, confusion_matrix],
                     feed_dict={x: img_batch, y: label_batch, is_train: False})

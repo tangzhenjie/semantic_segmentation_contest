@@ -57,11 +57,11 @@ def deeplab_v3(inputs, args, is_training, reuse):
                                spatial_squeeze=False,
                                output_stride=args.output_stride,
                                reuse=reuse)
-        if is_training:
-            exclude = [args.resnet_model + '/logits', 'global_step']
-            variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
-            tf.train.init_from_checkpoint(args.pre_trained_model,
-                                          {v.name.split(':')[0]: v for v in variables_to_restore})
+        #if is_training:
+        #    exclude = [args.resnet_model + '/logits', 'global_step']
+        #    variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
+        #    tf.train.init_from_checkpoint(args.pre_trained_model,
+        #                                  {v.name.split(':')[0]: v for v in variables_to_restore})
 
         with tf.variable_scope("DeepLab_v3", reuse=reuse):
 
