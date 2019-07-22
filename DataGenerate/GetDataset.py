@@ -93,11 +93,11 @@ def train_or_eval_input_fn(is_training, data_dir, batch_size, num_epochs=None):
     dataset = dataset.flat_map(tf.data.TFRecordDataset)
 
     if is_training:
-        dataset = dataset.shuffle(buffer_size=_NUM_IMAGES['train'])
+        dataset = dataset.shuffle(buffer_size=5000)
 
     dataset = dataset.map(parse_record)
-    dataset = dataset.map(
-        lambda image, label: preprocess_image(image, label, is_training))
+    #dataset = dataset.map(
+    #    lambda image, label: preprocess_image(image, label, is_training))
     dataset = dataset.prefetch(batch_size)
 
     # We call repeat after shuffling, rather than before, to prevent separate

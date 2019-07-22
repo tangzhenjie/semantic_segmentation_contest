@@ -1,15 +1,14 @@
 from NET import network
 from utils import preprocessing
 import tensorflow as tf
+import numpy as np
 
 _WEIGHT_DECAY = 5e-4
 
 
 def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     # 恢复图像
-    images = tf.cast(
-      tf.map_fn(preprocessing.mean_image_addition, x),
-      tf.uint8)
+    images = tf.cast(x, tf.uint8)
 
     # 前向传播
     logits = tf.cond(is_training, true_fn=lambda: network.deeplab_v3(x, args, is_training=True, reuse=False),
@@ -38,14 +37,8 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     logits_by_num_classes = tf.reshape(logits, [-1, args.number_of_classes])
     labels_flat = tf.reshape(labels, [-1, ])
 
-    # 去掉没有标签的255
-    valid_indices = tf.to_int32(labels_flat <= args.number_of_classes - 1)
-    logits_by_num_classes_new = tf.dynamic_partition(logits_by_num_classes, valid_indices, num_partitions=2)[1]
-    labels_flat_new = tf.dynamic_partition(labels_flat, valid_indices, num_partitions=2)[1]
-
-
     cross_entropy = tf.losses.sparse_softmax_cross_entropy(
-        logits=logits_by_num_classes_new, labels=labels_flat_new)
+        logits=logits_by_num_classes, labels=labels_flat)
 
     if not args.freeze_batch_norm:
         train_var_list = [v for v in tf.trainable_variables()]
@@ -76,12 +69,11 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
 
     # metrics
     preds_flat = tf.reshape(pred_classes, [-1, ])
-    preds_flat_new = tf.dynamic_partition(preds_flat, valid_indices, num_partitions=2)[1]
-    confusion_matrix = tf.confusion_matrix(labels_flat_new, preds_flat_new, num_classes=args.number_of_classes)
+    confusion_matrix = tf.confusion_matrix(labels_flat, preds_flat, num_classes=args.number_of_classes)
 
     predictions['confusion_matrix'] = confusion_matrix
 
-    correct_pred = tf.equal(preds_flat_new, labels_flat_new)
+    correct_pred = tf.equal(preds_flat, labels_flat)
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
     tf.summary.scalar('accuracy', accuracy)
 

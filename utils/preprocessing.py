@@ -19,7 +19,7 @@ label_colours = [(0, 0, 0)
                  # 11=村镇住宅, 12=交通运输, 13=河流, 14=湖泊, 15=坑塘]
 
 
-def decode_labels(mask, num_images=1, num_classes=21):
+def decode_labels(mask, num_images=1, num_classes=16):
   """Decode batch of segmentation masks.
 
   Args:

@@ -6,9 +6,9 @@ import tools
 import datetime
 import math
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-batch_size = 10
+batch_size = 16
 summary_path = "./summary/"
 checkpoint_path = "./checkpoint/"
 EPOCHS = 20
@@ -52,7 +52,7 @@ parser.add_argument('--end_learning_rate', type=float, default=1e-6,
 
 parser.add_argument('--initial_global_step', type=int, default=0,
                     help='Initial global step for controlling learning rate when fine-tuning model.')
-parser.add_argument('--max_iter', type=int, default=40000,
+parser.add_argument('--max_iter', type=int, default=25000,
                     help='Number of maximum iteration used for "poly" learning rate policy.')
 args = parser.parse_args()
 
@@ -64,9 +64,9 @@ def main():
     y = tf.placeholder(dtype=tf.int32, shape=[None, None, None, 1], name="label_batch")
 
     train_dataset = train_or_eval_input_fn(is_training=True,
-                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/train/", batch_size=batch_size)
+                                           data_dir="/media/user/1T_DISK/lost+found/tzj/semantic_segmentation_contest/DatasetNew/train/", batch_size=batch_size)
     eval_dataset = train_or_eval_input_fn(is_training=False,
-                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/val/", batch_size=batch_size, num_epochs=1)
+                                           data_dir="/media/user/1T_DISK/lost+found/tzj/semantic_segmentation_contest/DatasetNew/val/", batch_size=batch_size, num_epochs=1)
     iterator_train = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
     next_batch = iterator_train.get_next()
     training_init_op = iterator_train.make_initializer(train_dataset)
@@ -84,29 +84,29 @@ def main():
         tf.global_variables_initializer()
     )
     # 首次运行从deeplabv3中获取权重需要剔除logits层
-    exclude = [args.resnet_model + '/logits', 'DeepLab_v3/logits', 'global_step']
-    variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
+    #exclude = [args.resnet_model + '/logits', 'DeepLab_v3/logits', 'global_step']
+    #variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
 
-    saver_first = tf.train.Saver(variables_to_restore)
+    #saver_first = tf.train.Saver(variables_to_restore)
     saver = tf.train.Saver()
     summary_writer_train = tf.summary.FileWriter(summary_path + "train/")
     summary_writer_val = tf.summary.FileWriter(summary_path + "val/")
     # 运行图
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-    with tf.Session(config=config) as sess:
+    with tf.Session() as sess:
         sess.run(init_op, feed_dict={is_train: True})
         ckpt = tf.train.get_checkpoint_state(checkpoint_path)
         if ckpt and ckpt.model_checkpoint_path:
-            saver_first.restore(sess, ckpt.model_checkpoint_path)
+            saver.restore(sess, ckpt.model_checkpoint_path)
         sess.graph.finalize()
 
         train_batches_of_epoch = int(math.ceil(train_set_length / batch_size))
-        val_batches_of_epoch = int(math.ceil(eval_set_length / batch_size))
+        val_batches_of_epoch = int(math.floor(eval_set_length / batch_size))
         for epoch in range(EPOCHS):
             sess.run(training_init_op)
             print("{} Epoch number: {}".format(datetime.datetime.now(), epoch + 1))
-            # step = 1
+            # step = 1 (epoch * train_batches_of_epoch), ((epoch + 1) * train_batches_of_epoch)
             for step in range((epoch * train_batches_of_epoch), ((epoch + 1) * train_batches_of_epoch)):
                 img_batch, label_batch = sess.run(next_batch)
                 loss_value, _, acc, m_iou, merge, con_matrix = sess.run(
