@@ -9,7 +9,7 @@
 
 图片结果：
 <p align="center">
-  <img src="resource/2.png" width=500 height=250>
+  <img src="resource/2.png" width=500 height=20>
 </p>
 <p align="center">
   <img src="resource/1.png" width=500 height=250>
