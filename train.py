@@ -8,10 +8,10 @@ import math
 
 #os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-batch_size = 16
+batch_size = 8
 summary_path = "./summary/"
-checkpoint_path = "./checkpoint/"
-EPOCHS = 20
+checkpoint_path = "./checkpoint_no/"
+EPOCHS = 10
 train_set_length = 20000
 eval_set_length = 1000
 
@@ -54,19 +54,24 @@ parser.add_argument('--initial_global_step', type=int, default=0,
                     help='Initial global step for controlling learning rate when fine-tuning model.')
 parser.add_argument('--max_iter', type=int, default=25000,
                     help='Number of maximum iteration used for "poly" learning rate policy.')
+
+# aaf 参数
+parser.add_argument('--kld_margin', type=float, default=3.0, help='margin for affinity loss')
+parser.add_argument('--kld_lambda_1', type=float, default=1.0, help='Lambda for affinity loss at edge.')
+parser.add_argument('--kld_lambda_2', type=float, default=1.0, help='Lambda for affinity loss not at edge.')
 args = parser.parse_args()
 
 def main():
     os.environ['TF_ENABLE_WINOGRAD_NONFUSED'] = '0'
 
     is_train = tf.placeholder(tf.bool, shape=[])
-    x = tf.placeholder(dtype=tf.float32, shape=[None, None, None, 3], name="image_batch")
-    y = tf.placeholder(dtype=tf.int32, shape=[None, None, None, 1], name="label_batch")
+    x = tf.placeholder(dtype=tf.float32, shape=[batch_size, 500, 500, 3], name="image_batch")
+    y = tf.placeholder(dtype=tf.int32, shape=[batch_size, 500, 500, 1], name="label_batch")
 
     train_dataset = train_or_eval_input_fn(is_training=True,
-                                           data_dir="/media/user/1T_DISK/lost+found/tzj/semantic_segmentation_contest/DatasetNew/train/", batch_size=batch_size)
-    eval_dataset = train_or_evalccd_input_fn(is_training=False,
-                                           data_dir="/media/user/1T_DISK/lost+found/tzj/semantic_segmentation_contest/DatasetNew/val/", batch_size=batch_size, num_epochs=1)
+                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/train/", batch_size=batch_size)
+    eval_dataset = train_or_eval_input_fn(is_training=False,
+                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/val/", batch_size=batch_size, num_epochs=1)
     iterator_train = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
     next_batch = iterator_train.get_next()
     training_init_op = iterator_train.make_initializer(train_dataset)
@@ -84,11 +89,11 @@ def main():
         tf.global_variables_initializer()
     )
     # 首次运行从deeplabv3中获取权重需要剔除logits层
-    #exclude = [args.resnet_model + '/logits', 'DeepLab_v3/logits', 'global_step']
-    #variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
+    exclude = ['global_step']
+    variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
 
     #saver_first = tf.train.Saver(variables_to_restore)
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(variables_to_restore)
     summary_writer_train = tf.summary.FileWriter(summary_path + "train/")
     summary_writer_val = tf.summary.FileWriter(summary_path + "val/")
     # 运行图
@@ -113,7 +118,7 @@ def main():
                     [loss, train_op, accuracy, mean_iou, summary_op, confusion_matrix],
                     feed_dict={x: img_batch, y: label_batch, is_train: True})
 
-                if (step + 1) % 50 == 0:
+                if (step + 1) % 20 == 0:
                     kappa = tools.kappa(con_matrix)
                     print("{} {} loss = {:.4f}".format(datetime.datetime.now(), step + 1, loss_value))
                     print("accuracy{}".format(acc))
@@ -135,7 +140,6 @@ def main():
                 acc, m_iou, merge, con_matrix = sess.run(
                     [accuracy, mean_iou, summary_op, confusion_matrix],
                     feed_dict={x: img_batch, y: label_batch, is_train: False})
-
                 kappa = tools.kappa(con_matrix)
                 test_kappa += kappa
                 test_acc += acc
