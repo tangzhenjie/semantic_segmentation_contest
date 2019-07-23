@@ -65,7 +65,7 @@ def main():
 
     train_dataset = train_or_eval_input_fn(is_training=True,
                                            data_dir="/media/user/1T_DISK/lost+found/tzj/semantic_segmentation_contest/DatasetNew/train/", batch_size=batch_size)
-    eval_dataset = train_or_eval_input_fn(is_training=False,
+    eval_dataset = train_or_evalccd_input_fn(is_training=False,
                                            data_dir="/media/user/1T_DISK/lost+found/tzj/semantic_segmentation_contest/DatasetNew/val/", batch_size=batch_size, num_epochs=1)
     iterator_train = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
     next_batch = iterator_train.get_next()
