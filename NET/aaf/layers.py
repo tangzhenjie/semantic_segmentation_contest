@@ -55,7 +55,8 @@ def eightcorner_activation(x, size):
   if len(shape_x) != 4:
     raise ValueError('Only support for 4-D tensors!')
   n, h, w, c = shape_x
-
+  h = 500
+  w = 500
   # Pad at the margin.
   p = size
   x_pad = tf.pad(x,
