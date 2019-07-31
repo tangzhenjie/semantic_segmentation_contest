@@ -51,17 +51,8 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     with tf.variable_scope("total_loss"):
         loss = cross_entropy + _WEIGHT_DECAY * tf.add_n(
             [tf.nn.l2_loss(v) for v in train_var_list])
-        # affinity loss
-        edge_loss, not_edge_loss = affinity_loss(labels=y, probs=logits,
-                                                 num_classes=args.number_of_classes,
-                                                 kld_margin=args.kld_margin)
-        
-        dec = tf.pow(10.0, tf.cast(-global_step / args.max_iter, tf.float32))
-        aff_loss = tf.reduce_mean(edge_loss) * args.kld_lambda_1 * dec
-        aff_loss += tf.reduce_mean(not_edge_loss) * args.kld_lambda_2 * dec
 
-        total_loss = loss + aff_loss
-        tf.summary.scalar('loss', total_loss)
+        tf.summary.scalar('loss', loss)
     # 优化函数
     learning_rate = tf.train.polynomial_decay(
         args.initial_learning_rate,
@@ -74,7 +65,7 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     # Batch norm requires update ops to be added as a dependency to the train_op
     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
     with tf.control_dependencies(update_ops):
-        train_op = optimizer.minimize(total_loss, global_step, var_list=train_var_list)
+        train_op = optimizer.minimize(loss, global_step, var_list=train_var_list)
 
     # metrics
     preds_flat = tf.reshape(pred_classes, [-1, ])
@@ -124,7 +115,7 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
 
     metrics = {'px_accuracy': accuracy, 'mean_iou': mean_iou}
 
-    return total_loss, train_op, predictions, metrics
+    return loss, train_op, predictions, metrics
 
 
 # 没有对输入的合法性进行校验

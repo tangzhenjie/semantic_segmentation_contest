@@ -2,9 +2,15 @@ import tensorflow as tf
 from NET.resnet_v2_psp import resnet_utils, resnet_v2
 
 slim = tf.contrib.slim
-def psp_conv(x, kernel, scope, is_training=True):
-    conv_out = tf.nn.conv2d(x, [kernel, kernel, 2048, 512], [1, 1, 1, 1], padding='SAME')
-    bn = slim.batch_norm(conv_out, activation_fn=tf.nn.relu, is_training=is_training,scope=scope + "/bn")
+def psp_conv(x, kernel_size, scope_name, is_training=True):
+    filters_in = x.get_shape()[-1]
+    with tf.variable_scope(scope_name) as scope:
+        kernel = tf.get_variable(
+            name='weights',
+            shape=[kernel_size, kernel_size, filters_in, 512],
+            trainable=True)
+    conv_out = tf.nn.conv2d(x, kernel, [1, 1, 1, 1], padding='SAME')
+    bn = slim.batch_norm(conv_out, activation_fn=tf.nn.relu, is_training=is_training, scope=scope_name + "/bn")
     return bn
 
 def _pspnet_builder(x,
