@@ -11,8 +11,8 @@
 
 图片结果：
 <p align="center">
-      <img src="resource/2.png" width=500 height=500>
+      <img src="resource/2.png" width=1000 height=500>
 </p>
 <p align="center">
-  <img src="resource/1.png" width=500 height=500>
+  <img src="resource/1.png" width=1000 height=500>
 </p>
