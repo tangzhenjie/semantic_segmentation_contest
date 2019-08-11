@@ -1,19 +1,20 @@
-﻿from DataGenerate.GetDataset import train_or_eval_input_fn
+﻿from GeneratingBatchSize.GetDataset import train_or_eval_input_fn
 import tensorflow as tf
 import os
 import argparse
-import tools
+import tools_aaf
 import datetime
 import math
 
-#os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-batch_size = 8
-summary_path = "./summary/"
-checkpoint_path = "./checkpoint_no/"
-EPOCHS = 10
-train_set_length = 20000
-eval_set_length = 1000
+batch_size = 4
+summary_path = "./summary_aff/"
+checkpoint_path_voc = ""
+checkpoint_path = "./checkpoint_aff/"
+EPOCHS = 50
+train_set_length = 5000
+eval_set_length = 500
 
 parser = argparse.ArgumentParser()
 
@@ -22,7 +23,7 @@ envarg = parser.add_argument_group('Training params')
 # BN params
 envarg.add_argument("--batch_norm_epsilon", type=float, default=1e-5, help="batch norm epsilon argument for batch normalization")
 envarg.add_argument('--batch_norm_decay', type=float, default=0.9997, help='batch norm decay argument for batch normalization.')
-envarg.add_argument('--freeze_batch_norm', type=bool, default=False,  help='Freeze batch normalization parameters during the training.')
+envarg.add_argument('--freeze_batch_norm', type=bool, default=True,  help='Freeze batch normalization parameters during the training.')
 # the number of classes
 envarg.add_argument("--number_of_classes", type=int, default=16, help="Number of classes to be predicted.")
 
@@ -52,7 +53,7 @@ parser.add_argument('--end_learning_rate', type=float, default=1e-6,
 
 parser.add_argument('--initial_global_step', type=int, default=0,
                     help='Initial global step for controlling learning rate when fine-tuning model.')
-parser.add_argument('--max_iter', type=int, default=25000,
+parser.add_argument('--max_iter', type=int, default=62500,
                     help='Number of maximum iteration used for "poly" learning rate policy.')
 
 # aaf 参数
@@ -65,23 +66,23 @@ def main():
     os.environ['TF_ENABLE_WINOGRAD_NONFUSED'] = '0'
 
     is_train = tf.placeholder(tf.bool, shape=[])
-    x = tf.placeholder(dtype=tf.float32, shape=[batch_size, 500, 500, 3], name="image_batch")
-    y = tf.placeholder(dtype=tf.int32, shape=[batch_size, 500, 500, 1], name="label_batch")
+    x = tf.placeholder(dtype=tf.float32, shape=[batch_size, 1000, 1000, 3], name="image_batch")
+    y = tf.placeholder(dtype=tf.int32, shape=[batch_size, 1000, 1000, 1], name="label_batch")
 
     train_dataset = train_or_eval_input_fn(is_training=True,
-                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/train/", batch_size=batch_size)
+                                           data_dir="./DatasetNew/train/", batch_size=batch_size)
     eval_dataset = train_or_eval_input_fn(is_training=False,
-                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/val/", batch_size=batch_size, num_epochs=1)
+                                           data_dir="./DatasetNew/val/", batch_size=batch_size, num_epochs=1)
     iterator_train = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
     next_batch = iterator_train.get_next()
     training_init_op = iterator_train.make_initializer(train_dataset)
     evaling_init_op = iterator_train.make_initializer(eval_dataset)
 
-    loss, train_op, predictions, metrics = tools.get_loss_pre_metrics(x, y, is_train, batch_size, args)
+    loss, train_op, metrics = tools_aaf.get_loss_pre_metrics(x, y, is_train, batch_size, args)
 
     accuracy = metrics["px_accuracy"]
     mean_iou = metrics["mean_iou"]
-    confusion_matrix = predictions['confusion_matrix']
+    confusion_matrix = metrics['confusion_matrix']
 
     summary_op = tf.summary.merge_all()
     init_op = tf.group(
@@ -92,8 +93,8 @@ def main():
     exclude = ['global_step']
     variables_to_restore = tf.contrib.slim.get_variables_to_restore(exclude=exclude)
 
-    #saver_first = tf.train.Saver(variables_to_restore)
-    saver = tf.train.Saver(variables_to_restore)
+    saver_first = tf.train.Saver(variables_to_restore)
+    saver = tf.train.Saver(max_to_keep=50)
     summary_writer_train = tf.summary.FileWriter(summary_path + "train/")
     summary_writer_val = tf.summary.FileWriter(summary_path + "val/")
     # 运行图
@@ -101,9 +102,9 @@ def main():
     config.gpu_options.allow_growth = True
     with tf.Session() as sess:
         sess.run(init_op, feed_dict={is_train: True})
-        ckpt = tf.train.get_checkpoint_state(checkpoint_path)
+        ckpt = tf.train.get_checkpoint_state(checkpoint_path_voc)
         if ckpt and ckpt.model_checkpoint_path:
-            saver.restore(sess, ckpt.model_checkpoint_path)
+            saver_first.restore(sess, ckpt.model_checkpoint_path)
         sess.graph.finalize()
 
         train_batches_of_epoch = int(math.ceil(train_set_length / batch_size))
@@ -114,12 +115,13 @@ def main():
             # step = 1 (epoch * train_batches_of_epoch), ((epoch + 1) * train_batches_of_epoch)
             for step in range((epoch * train_batches_of_epoch), ((epoch + 1) * train_batches_of_epoch)):
                 img_batch, label_batch = sess.run(next_batch)
-                loss_value, _, acc, m_iou, merge, con_matrix = sess.run(
-                    [loss, train_op, accuracy, mean_iou, summary_op, confusion_matrix],
-                    feed_dict={x: img_batch, y: label_batch, is_train: True})
+                sess.run([train_op], feed_dict={x: img_batch, y: label_batch, is_train: True})
 
-                if (step + 1) % 20 == 0:
-                    kappa = tools.kappa(con_matrix)
+                if (step + 1) % 625 == 0:
+                    loss_value, acc, m_iou, merge, con_matrix = sess.run(
+                        [loss, accuracy, mean_iou, summary_op, confusion_matrix],
+                        feed_dict={x: img_batch, y: label_batch, is_train: True})
+                    kappa = tools_aaf.kappa(con_matrix)
                     print("{} {} loss = {:.4f}".format(datetime.datetime.now(), step + 1, loss_value))
                     print("accuracy{}".format(acc))
                     print("miou{}".format(m_iou))
@@ -140,7 +142,7 @@ def main():
                 acc, m_iou, merge, con_matrix = sess.run(
                     [accuracy, mean_iou, summary_op, confusion_matrix],
                     feed_dict={x: img_batch, y: label_batch, is_train: False})
-                kappa = tools.kappa(con_matrix)
+                kappa = tools_aaf.kappa(con_matrix)
                 test_kappa += kappa
                 test_acc += acc
                 test_miou += m_iou

@@ -1,17 +1,17 @@
-﻿from DataGenerate.GetDataset import train_or_eval_input_fn
+﻿from GeneratingBatchSize.GetDataset import train_or_eval_input_fn
 import tensorflow as tf
 import os
 import argparse
-import psp_tools
+import tools_psp
 import datetime
 import math
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 batch_size = 3
-summary_path = "./psp_summary/"
-checkpoint_path = "./psp_checkpoint/"
-EPOCHS = 100
+summary_path = "./summary_psp/"
+checkpoint_path = "./checkpoint_psp/"
+EPOCHS = 50
 train_set_length = 5000
 eval_set_length = 500
 
@@ -40,7 +40,7 @@ envarg.add_argument('--pre_trained_model', type=str, default='./pre_trained_mode
 parser.add_argument('--tensorboard_images_max_outputs', type=int, default=4,
                     help='Max number of batch elements to generate for Tensorboard.')
 # poly learn_rate
-parser.add_argument('--initial_learning_rate', type=float, default=5e-3,
+parser.add_argument('--initial_learning_rate', type=float, default=7e-3,
                     help='Initial learning rate for the optimizer.')
 
 parser.add_argument('--end_learning_rate', type=float, default=1e-6,
@@ -48,7 +48,7 @@ parser.add_argument('--end_learning_rate', type=float, default=1e-6,
 
 parser.add_argument('--initial_global_step', type=int, default=0,
                     help='Initial global step for controlling learning rate when fine-tuning model.')
-parser.add_argument('--max_iter', type=int, default=125000,
+parser.add_argument('--max_iter', type=int, default=83333,
                     help='Number of maximum iteration used for "poly" learning rate policy.')
 args = parser.parse_args()
 
@@ -60,15 +60,15 @@ def main():
     y = tf.placeholder(dtype=tf.int32, shape=[None, 1000, 1000, 1], name="label_batch")
 
     train_dataset = train_or_eval_input_fn(is_training=True,
-                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/train/", batch_size=batch_size)
+                                           data_dir="./DatasetNew/train/", batch_size=batch_size)
     eval_dataset = train_or_eval_input_fn(is_training=False,
-                                           data_dir="/2T/tzj/semantic_segmentation_contest/DatasetNew/val/", batch_size=batch_size, num_epochs=1)
+                                           data_dir="./DatasetNew/val/", batch_size=batch_size, num_epochs=1)
     iterator_train = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
     next_batch = iterator_train.get_next()
     training_init_op = iterator_train.make_initializer(train_dataset)
     evaling_init_op = iterator_train.make_initializer(eval_dataset)
 
-    loss, train_op, metrics = psp_tools.get_loss_pre_metrics(x, y, is_train, batch_size, args)
+    loss, train_op, metrics = tools_psp.get_loss_pre_metrics(x, y, is_train, batch_size, args)
 
     accuracy = metrics["px_accuracy"]
     mean_iou = metrics["mean_iou"]
@@ -104,11 +104,11 @@ def main():
                 img_batch, label_batch = sess.run(next_batch)
                 sess.run([train_op], feed_dict={x: img_batch, y: label_batch, is_train: True})
 
-                if (step + 1) % 10 == 0:
+                if (step + 1) % 833 == 0:
                     loss_value, acc, m_iou, con_matrix = sess.run(
                         [loss, accuracy, mean_iou, confusion_matrix],
                         feed_dict={x: img_batch, y: label_batch, is_train: True})
-                    kappa = psp_tools.kappa(con_matrix)
+                    kappa = tools_psp.kappa(con_matrix)
                     print("{} {} loss = {:.4f}".format(datetime.datetime.now(), step + 1, loss_value))
                     print("accuracy{}".format(acc))
                     print("miou{}".format(m_iou))
@@ -131,7 +131,7 @@ def main():
                     [accuracy, mean_iou, confusion_matrix],
                     feed_dict={x: img_batch, y: label_batch, is_train: False})
 
-                kappa = psp_tools.kappa(con_matrix)
+                kappa = tools_psp.kappa(con_matrix)
                 test_kappa += kappa
                 test_acc += acc
                 test_miou += m_iou

@@ -3,7 +3,7 @@ import cv2
 import os
 import argparse
 import tensorflow as tf
-from NET import network
+from NET import deeplab_v3
 from utils.preprocessing import decode_labels
 
 checkpoint_path = "./checkpoint_1000/"
@@ -88,7 +88,7 @@ args = parser.parse_args()
 img_batch = tf.placeholder("float32", shape=[None, 500, 500, 3], name="img_batch")
 # 损失
 
-logits = network.deeplab_v3(img_batch, args, is_training=False, reuse=False)
+logits = deeplab_v3.deeplab_v3(img_batch, args, is_training=False, reuse=False)
 prediction = tf.argmax(logits, axis=3)
 prediction = tf.expand_dims(prediction, axis=3)
 

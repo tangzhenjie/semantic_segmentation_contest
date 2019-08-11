@@ -1,4 +1,4 @@
-from NET import network
+﻿from NET import deeplabv3_DA
 from utils import preprocessing
 import tensorflow as tf
 import numpy as np
@@ -8,22 +8,16 @@ _WEIGHT_DECAY = 5e-4
 
 def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     # 恢复图像
-    images = tf.cast(tf.gather(x, [1, 2, 3], axis=3), tf.uint8)
+    images = tf.cast(x, tf.uint8)
 
     # 前向传播
-    logits = tf.cond(is_training, true_fn=lambda: network.deeplab_v3(x, args, is_training=True, reuse=False),
-                     false_fn=lambda: network.deeplab_v3(x, args, is_training=False, reuse=True))
+    logits = tf.cond(is_training, true_fn=lambda: deeplabv3_DA.deeplabv3_DA(x, args, is_training=True, reuse=False),
+                     false_fn=lambda: deeplabv3_DA.deeplabv3_DA(x, args, is_training=False, reuse=True))
     pred_classes = tf.expand_dims(tf.argmax(logits, axis=3, output_type=tf.int32), axis=3)
 
     # 解码预测结果
     pred_decoded_labels = tf.py_func(preprocessing.decode_labels, [pred_classes, batch_size, args.number_of_classes], tf.uint8)
 
-
-    predictions = {
-        'pred': pred_classes,
-        'probabilities': tf.nn.softmax(logits, name='softmax_tensor'),
-        'decoded_labels': pred_decoded_labels
-    }
 
     # 解码标签
     gt_decoded_labels = tf.py_func(preprocessing.decode_labels, [y, batch_size, args.number_of_classes], tf.uint8)
@@ -71,8 +65,6 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     preds_flat = tf.reshape(pred_classes, [-1, ])
     confusion_matrix = tf.confusion_matrix(labels_flat, preds_flat, num_classes=args.number_of_classes)
 
-    predictions['confusion_matrix'] = confusion_matrix
-
     correct_pred = tf.equal(preds_flat, labels_flat)
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
     tf.summary.scalar('accuracy', accuracy)
@@ -113,9 +105,9 @@ def get_loss_pre_metrics(x, y, is_training, batch_size, args):
 
     tf.summary.scalar('mean_iou', mean_iou)
 
-    metrics = {'px_accuracy': accuracy, 'mean_iou': mean_iou}
+    metrics = {'px_accuracy': accuracy, 'mean_iou': mean_iou, 'confusion_matrix': confusion_matrix}
 
-    return loss, train_op, predictions, metrics
+    return loss, train_op, metrics
 
 
 # 没有对输入的合法性进行校验

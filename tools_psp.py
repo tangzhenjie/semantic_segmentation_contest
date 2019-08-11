@@ -8,9 +8,7 @@ _WEIGHT_DECAY = 1e-4
 
 def get_loss_pre_metrics(x, y, is_training, batch_size, args):
     # 恢复图像
-    images = tf.cast(
-        tf.map_fn(preprocessing.mean_image_addition, x),
-        tf.uint8)
+    images = tf.cast(x, tf.uint8)
 
     # 前向传播
     logits = tf.cond(is_training, true_fn=lambda: pspnet.pspnet_resnet(x, args, is_training=True, reuse=False),

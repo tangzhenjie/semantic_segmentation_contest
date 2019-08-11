@@ -170,7 +170,6 @@ def random_crop_or_pad_image_and_label(image, label, crop_height, crop_width, ig
     If `images` was 3-D, a 3-D float Tensor of shape
     `[new_height, new_width, channels]`.
   """
-  label = label - ignore_label  # Subtract due to 0 padding.
   label = tf.to_float(label)
   image_height = tf.shape(image)[0]
   image_width = tf.shape(image)[1]
@@ -184,7 +183,6 @@ def random_crop_or_pad_image_and_label(image, label, crop_height, crop_width, ig
 
   image_crop = image_and_label_crop[:, :, :3]
   label_crop = image_and_label_crop[:, :, 3:]
-  label_crop += ignore_label
   label_crop = tf.to_int32(label_crop)
 
   return image_crop, label_crop

@@ -40,7 +40,7 @@ def atrous_spatial_pyramid_pooling(net, scope, depth=256, reuse=None):
         return net
 
 
-def deeplab_v3(inputs, args, is_training, reuse):
+def deeplabv3_plus(inputs, args, is_training, reuse):
 
     # mean subtraction normalization
     #inputs = inputs - [_R_MEAN, _G_MEAN, _B_MEAN]
@@ -68,15 +68,31 @@ def deeplab_v3(inputs, args, is_training, reuse):
             # get block 4 feature outputs
             net = end_points[args.resnet_model + '/block4']
 
-            net = atrous_spatial_pyramid_pooling(net, "ASPP_layer", depth=256, reuse=reuse)
+            encoder_output = atrous_spatial_pyramid_pooling(net, "ASPP_layer", depth=256, reuse=reuse)
 
-            net = slim.conv2d(net, args.number_of_classes, [1, 1], activation_fn=None,
-                              normalizer_fn=None, scope='logits')
+            #net = slim.conv2d(net, args.number_of_classes, [1, 1], activation_fn=None,
+            #                  normalizer_fn=None, scope='logits')
 
-            size = tf.shape(inputs)[1:3]
+            #size = tf.shape(inputs)[1:3]
             # resize the output logits to match the labels dimensions
             #net = tf.image.resize_nearest_neighbor(net, size)
-            net = tf.image.resize_bilinear(net, size)
-            return net
+            #net = tf.image.resize_bilinear(net, size)
+        with tf.variable_scope("decoder", reuse=reuse):
+            with tf.variable_scope("low_level_features"):
+                low_level_features = end_points[args.resnet_model + '/block1/unit_3/bottleneck_v2/conv1']
+                low_level_features = slim.conv2d(low_level_features, 48,
+                                                       [1, 1], normalizer_fn=None, scope='conv_1x1')
+                low_level_features_size = tf.shape(low_level_features)[1:3]
+
+            with tf.variable_scope("upsampling_logits"):
+                net_decode = tf.image.resize_bilinear(encoder_output, low_level_features_size, name='upsample_1')
+                net_decode = tf.concat([net_decode, low_level_features], axis=3, name='concat')
+                net_decode = slim.conv2d(net_decode, 256, [3, 3], normalizer_fn=None, scope='conv_3x3_1')
+                net_decode = slim.conv2d(net_decode, 256, [3, 3], normalizer_fn=None, scope='conv_3x3_2')
+                net_decode = slim.conv2d(net_decode, args.number_of_classes, [1, 1], activation_fn=None, normalizer_fn=None,
+                                        scope='conv_1x1')
+                size = tf.shape(inputs)[1:3]
+                logits = tf.image.resize_bilinear(net_decode, size, name='upsample_2')
+        return logits
 
 
